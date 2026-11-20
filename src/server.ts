@@ -10,9 +10,21 @@ const httpServer = createServer(app)
 app.get('/', (req, res) => {
     res.send('Hello World')
 })
-setupSocket(httpServer)
+const io = setupSocket(httpServer)
 httpServer.listen(config.port, () => {
     console.log(`Server is running on http://localhost:${config.port}`)
 })
+
+function encerrar() {
+    console.log('\nEncerrando servidor...');
+    io.close(() => {
+        httpServer.close(() => {
+            process.exit(0);
+        });
+    });
+}
+
+process.on('SIGINT', encerrar);
+process.on('SIGTERM', encerrar);
 
 
