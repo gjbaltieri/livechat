@@ -91,7 +91,7 @@ function handleEnterClassroomFromLobby(roomId) {
   if (!ROOMS_CONFIG[roomId]) return;
 
   if (state.connectionStatus !== 'connected') {
-    showToast('Servidor desconectado. Verifique se o backend está rodando na porta 3000.', 'error');
+    showToast('Servidor desconectado. Aguarde a reconexão e tente novamente.', 'error');
     return;
   }
 

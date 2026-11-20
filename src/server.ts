@@ -1,4 +1,5 @@
 import express from 'express'
+import path from 'path'
 import { createServer } from 'http'
 import { setupSocket } from './socket';
 import { config } from './config';
@@ -6,10 +7,7 @@ import { config } from './config';
 const app = express()
 const httpServer = createServer(app)
 
-
-app.get('/', (req, res) => {
-    res.send('Hello World')
-})
+app.use(express.static(path.resolve(process.cwd(), 'public')))
 const io = setupSocket(httpServer)
 httpServer.listen(config.port, () => {
     console.log(`Server is running on http://localhost:${config.port}`)

@@ -1,13 +1,10 @@
 /**
  * @file Serviço WebSocket isolado para comunicação com o servidor Socket.IO.
- * Conecta via `http://${window.location.hostname}:3000` para funcionar no PC e celular na mesma rede.
+ * Conecta automaticamente na mesma origem/porta onde a página foi aberta.
  */
 
-const host = window.location.hostname || 'localhost';
-const BACKEND_URL = `http://${host}:3000`;
-
 /**
- * Inicializa o cliente Socket.IO v4.8.1 e registra os callbacks da aplicação.
+ * Inicializa o cliente Socket.IO e registra os callbacks da aplicação.
  * @param {{
  *   onConnect: (socketId: string) => void,
  *   onDisconnect: (reason: string) => void,
@@ -19,14 +16,9 @@ const BACKEND_URL = `http://${host}:3000`;
  * }} handlers
  */
 export function createSocketClient(handlers) {
-  // global `io` carregado via CDN (Socket.IO v4.8.1)
+  // global `io` servido pelo próprio backend em /socket.io/socket.io.js
   // @ts-ignore
-  const socket = window.io(BACKEND_URL, {
-    transports: ['websocket', 'polling'],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-  });
+  const socket = window.io();
 
   socket.on('connect', () => {
     handlers.onConnect(socket.id);
