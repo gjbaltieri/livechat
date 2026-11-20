@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 interface Question {
     id: string;
     room: string;
@@ -16,7 +18,7 @@ export function getQuestions(room: string) {
 
 export function addQuestion(room: string, userId: string, username: string, text: string) {
     questions.push({
-        id: String(Date.now()),
+        id: randomUUID(),
         room,
         username,
         text,
