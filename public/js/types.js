@@ -1,6 +1,5 @@
 /**
- * @file Contratos e tipos (via JSDoc) espelhando EXATAMENTE o backend (src/socket.ts)
- * e os modelos locais da seção de dúvidas.
+ * @file Contratos e tipos (via JSDoc) espelhando EXATAMENTE o backend (src/socket.ts e src/questions.ts).
  */
 
 /**
@@ -33,23 +32,25 @@
  */
 
 /**
- * Modelo local de uma sala fixa da plataforma.
- * @typedef {Object} RoomInfo
- * @property {string} id
- * @property {string} title
- * @property {string} teacher
+ * Item de dúvida retornado no array do evento `lista_duvidas` pelo backend (`src/questions.ts`).
+ * @typedef {Object} QuestionPayload
+ * @property {string} id - Identificador da dúvida
+ * @property {string} room - Sala da dúvida
+ * @property {string} username - Nome do aluno autor da dúvida
+ * @property {string} text - Texto da dúvida (máx. 300 caracteres no backend)
+ * @property {string[]} voters - Array com os `socket.id` dos alunos que votaram (voters[0] é o autor)
  */
 
 /**
- * Modelo local de uma dúvida (armazenada em memória no frontend).
- * @typedef {Object} QuestionItem
+ * Configuração de cada sala da plataforma AulaLive.
+ * @typedef {Object} RoomConfig
  * @property {string} id
- * @property {string} room
- * @property {string} author
- * @property {string} text
- * @property {number} votes
- * @property {boolean} votedByMe
- * @property {string} createdAt
+ * @property {string} materia
+ * @property {string} videoId
+ * @property {string} canal
+ * @property {string} titulo
+ * @property {string} descricao
+ * @property {string} url
  */
 
 export {};

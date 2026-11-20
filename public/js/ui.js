@@ -1,8 +1,9 @@
 /**
- * @file Componentes de renderização de UI seguros contra XSS (uso exclusivo de createElement + textContent).
+ * @file Renderização da interface em 2 telas (Lobby e Sala da Aula) com proteção estrita contra XSS
+ * (uso exclusivo de document.createElement e textContent).
  */
 
-import { ROOMS, state, getSortedQuestions } from './state.js';
+import { ROOMS_CONFIG, ROOMS_LIST, state } from './state.js';
 
 /**
  * Formata uma string ISO-8601 no formato local `HH:mm`.
@@ -19,7 +20,7 @@ export function formatTimeHHMM(isoString) {
 
 /**
  * Exibe um toast visual temporário (erro, aviso ou sucesso).
- * Usa exclusivamente `textContent` para evitar XSS.
+ * Usa exclusivamente `textContent`.
  * @param {string} message
  * @param {'error' | 'info' | 'success'} [type='error']
  */
@@ -56,160 +57,229 @@ export function showToast(message, type = 'error') {
 }
 
 /**
- * Atualiza o selo de status da conexão com o servidor Socket.IO.
+ * Atualiza o indicador de status do servidor ao lado do nome do usuário na sala.
  */
-export function renderConnectionBadge() {
-  const badge = document.getElementById('conn-badge');
-  const dot = document.getElementById('conn-dot');
-  const text = document.getElementById('conn-text');
+export function renderConnectionStatus() {
+  const badge = document.getElementById('room-conn-badge');
+  const dot = document.getElementById('room-conn-dot');
+  const text = document.getElementById('room-conn-text');
+  const baseClass = 'inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl border';
+
   if (!badge || !dot || !text) return;
 
   if (state.connectionStatus === 'connected') {
-    badge.className =
-      'inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-    dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+    badge.className = `${baseClass} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`;
+    dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
     text.textContent = 'Servidor conectado';
   } else if (state.connectionStatus === 'connecting') {
-    badge.className =
-      'inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20';
-    dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse';
-    text.textContent = 'Conectando ao servidor...';
+    badge.className = `${baseClass} bg-amber-500/10 text-amber-400 border-amber-500/20`;
+    dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+    text.textContent = 'Conectando...';
   } else {
-    badge.className =
-      'inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20';
-    dot.className = 'w-1.5 h-1.5 rounded-full bg-red-400';
-    text.textContent = 'Servidor offline (localhost:3000)';
+    badge.className = `${baseClass} bg-red-500/10 text-red-400 border-red-500/20`;
+    dot.className = 'w-2 h-2 rounded-full bg-red-400';
+    text.textContent = 'Desconectado';
   }
 }
 
 /**
- * Renderiza os 4 cards clicáveis de salas de aula e destaca visualmente a sala ativa.
+ * Renderiza o grid de 4 cards de aulas ao vivo na Tela 1 (Lobby).
  * @param {(roomId: string) => void} onSelectRoom
  */
-export function renderRoomsBar(onSelectRoom) {
-  const container = document.getElementById('rooms-bar');
-  if (!container) return;
-  container.replaceChildren();
+export function renderLobbyCards(onSelectRoom) {
+  const grid = document.getElementById('lobby-rooms-grid');
+  if (!grid) return;
+  grid.replaceChildren();
 
-  ROOMS.forEach((room) => {
-    const isActive = state.selectedRoom === room.id;
-    const isJoinedHere = state.joinedRoom === room.id;
+  ROOMS_LIST.forEach((room) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className =
+      'group text-left p-5 rounded-2xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/70 transition-all shadow-lg hover:shadow-indigo-950/40 flex flex-col justify-between gap-4';
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.setAttribute('role', 'tab');
-    btn.setAttribute('aria-selected', String(isActive));
+    const topBar = document.createElement('div');
+    topBar.className = 'flex items-center justify-between gap-2 w-full';
 
-    btn.className = isActive
-      ? 'text-left p-3 rounded-xl border transition flex flex-col justify-between gap-1 bg-indigo-600/15 border-indigo-500 text-white shadow-md shadow-indigo-950/50'
-      : 'text-left p-3 rounded-xl border transition flex flex-col justify-between gap-1 bg-slate-800/50 hover:bg-slate-800 border-slate-800 text-slate-300';
+    const liveBadge = document.createElement('span');
+    liveBadge.className =
+      'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-red-600 text-white text-[11px] font-bold uppercase tracking-wider shadow-sm';
 
-    const topRow = document.createElement('div');
-    topRow.className = 'flex items-center justify-between gap-2 w-full';
+    const pingDot = document.createElement('span');
+    pingDot.className = 'w-1.5 h-1.5 rounded-full bg-white animate-ping';
+
+    const liveText = document.createElement('span');
+    liveText.textContent = 'AO VIVO';
+
+    liveBadge.appendChild(pingDot);
+    liveBadge.appendChild(liveText);
 
     const codeBadge = document.createElement('span');
-    codeBadge.className = isActive
-      ? 'text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500 text-white font-semibold'
-      : 'text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400';
+    codeBadge.className =
+      'text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700';
     codeBadge.textContent = room.id;
 
-    const statusPill = document.createElement('span');
-    if (isJoinedHere) {
-      statusPill.className = 'text-[11px] font-medium text-emerald-400 flex items-center gap-1';
-      statusPill.textContent = '● Na sala';
-    } else if (isActive) {
-      statusPill.className = 'text-[11px] font-medium text-indigo-300';
-      statusPill.textContent = 'Selecionada';
-    } else {
-      statusPill.className = 'text-[11px] text-slate-500';
-      statusPill.textContent = 'Trocar aula';
-    }
+    topBar.appendChild(liveBadge);
+    topBar.appendChild(codeBadge);
 
-    topRow.appendChild(codeBadge);
-    topRow.appendChild(statusPill);
+    const middleBox = document.createElement('div');
+    middleBox.className = 'space-y-1';
 
-    const titleEl = document.createElement('p');
-    titleEl.className = 'text-sm font-semibold truncate mt-1';
-    titleEl.textContent = room.title;
+    const subjectEl = document.createElement('h2');
+    subjectEl.className =
+      'text-lg font-bold text-white group-hover:text-indigo-300 transition';
+    subjectEl.textContent = room.materia;
 
-    btn.appendChild(topRow);
-    btn.appendChild(titleEl);
+    const channelEl = document.createElement('p');
+    channelEl.className = 'text-xs font-medium text-indigo-400';
+    channelEl.textContent = room.canal;
 
-    btn.addEventListener('click', () => onSelectRoom(room.id));
-    container.appendChild(btn);
+    const descEl = document.createElement('p');
+    descEl.className = 'text-xs text-slate-400 line-clamp-2 pt-1 leading-relaxed';
+    descEl.textContent = room.descricao;
+
+    middleBox.appendChild(subjectEl);
+    middleBox.appendChild(channelEl);
+    middleBox.appendChild(descEl);
+
+    const footerBar = document.createElement('div');
+    footerBar.className =
+      'pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-indigo-400 group-hover:text-indigo-300';
+
+    const enterLabel = document.createElement('span');
+    enterLabel.textContent = 'Entrar na sala ao vivo';
+
+    const arrowSpan = document.createElement('span');
+    arrowSpan.className = 'transform group-hover:translate-x-1 transition';
+    arrowSpan.textContent = '→';
+
+    footerBar.appendChild(enterLabel);
+    footerBar.appendChild(arrowSpan);
+
+    card.appendChild(topBar);
+    card.appendChild(middleBox);
+    card.appendChild(footerBar);
+
+    card.addEventListener('click', () => onSelectRoom(room.id));
+    grid.appendChild(card);
   });
 }
 
 /**
- * Atualiza os textos do player de vídeo simulado e cabeçalhos de acordo com a sala ativa.
+ * Alterna a visibilidade entre Tela 1 (Lobby) e Tela 2 (Sala da Aula).
  */
-export function renderRoomHeaderAndPlayer() {
-  const currentRoom = ROOMS.find((r) => r.id === state.selectedRoom) || ROOMS[0];
+export function renderScreenVisibility() {
+  const lobbyScreen = document.getElementById('lobby-screen');
+  const classroomScreen = document.getElementById('classroom-screen');
+  if (!lobbyScreen || !classroomScreen) return;
 
-  const playerCode = document.getElementById('player-room-code');
-  const playerTitle = document.getElementById('player-room-title');
-  const playerTeacher = document.getElementById('player-room-teacher');
-  const playerUserStatus = document.getElementById('player-user-status');
-  const chatRoomBadge = document.getElementById('chat-room-badge');
-  const chatSubtitle = document.getElementById('chat-subtitle');
-  const chatInput = /** @type {HTMLInputElement | null} */ (document.getElementById('chat-input'));
-  const chatSendBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('chat-send-btn'));
-  const joinBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('join-btn'));
-  const questionsRoomLabel = document.getElementById('questions-room-label');
-
-  if (playerCode) playerCode.textContent = currentRoom.id;
-  if (playerTitle) playerTitle.textContent = currentRoom.title;
-  if (playerTeacher) playerTeacher.textContent = currentRoom.teacher;
-  if (chatRoomBadge) chatRoomBadge.textContent = currentRoom.id;
-  if (questionsRoomLabel) {
-    questionsRoomLabel.textContent = `${currentRoom.title} (${currentRoom.id})`;
-  }
-
-  const isInSelectedRoom = Boolean(state.joinedRoom && state.joinedRoom === state.selectedRoom && state.username);
-
-  if (playerUserStatus) {
-    playerUserStatus.textContent = isInSelectedRoom
-      ? `${state.username} (${state.joinedRoom})`
-      : 'Aguardando entrada na sala';
-  }
-
-  if (chatSubtitle) {
-    chatSubtitle.textContent = isInSelectedRoom
-      ? `Conectado como ${state.username}`
-      : 'Digite seu nome no topo e clique em Entrar para participar';
-  }
-
-  if (joinBtn) {
-    joinBtn.textContent = isInSelectedRoom ? 'Atualizar Nome' : 'Entrar';
-  }
-
-  const canSend = isInSelectedRoom && state.connectionStatus === 'connected';
-  if (chatInput) {
-    chatInput.disabled = !canSend;
-    chatInput.placeholder = canSend
-      ? `Mensagem em ${currentRoom.id}...`
-      : 'Entre na sala para enviar mensagens...';
-  }
-  if (chatSendBtn) {
-    chatSendBtn.disabled = !canSend;
+  if (state.currentScreen === 'lobby') {
+    lobbyScreen.classList.remove('hidden');
+    lobbyScreen.classList.add('flex');
+    classroomScreen.classList.add('hidden');
+    classroomScreen.classList.remove('flex');
+  } else {
+    lobbyScreen.classList.add('hidden');
+    lobbyScreen.classList.remove('flex');
+    classroomScreen.classList.remove('hidden');
+    classroomScreen.classList.add('flex');
   }
 }
 
 /**
- * Renderiza toda a lista de mensagens e avisos do chat com rolagem automática.
+ * Carrega os dados da sala ativa na Tela 2 (cabeçalho, iframe do YouTube sem autoplay e créditos).
+ * Só atualiza o `src` do iframe se o vídeo mudou, evitando recarregar o player em reconexões.
+ */
+export function renderClassroomDetails() {
+  if (!state.joinedRoom) return;
+  const room = ROOMS_CONFIG[state.joinedRoom];
+  if (!room) return;
+
+  const codeBadge = document.getElementById('room-code-badge');
+  const subjectTitle = document.getElementById('room-subject-title');
+  const studentName = document.getElementById('room-student-name');
+  const creditsChannel = document.getElementById('credits-channel');
+  const creditsTitle = document.getElementById('credits-title');
+  const creditsDesc = document.getElementById('credits-description');
+  const creditsLink = /** @type {HTMLAnchorElement | null} */ (
+    document.getElementById('credits-youtube-link')
+  );
+  const iframe = /** @type {HTMLIFrameElement | null} */ (
+    document.getElementById('youtube-iframe')
+  );
+
+  if (codeBadge) codeBadge.textContent = room.id;
+  if (subjectTitle) subjectTitle.textContent = `${room.materia} — ${room.canal}`;
+  if (studentName) studentName.textContent = state.username;
+
+  if (creditsChannel) creditsChannel.textContent = room.canal;
+  if (creditsTitle) creditsTitle.textContent = room.titulo;
+  if (creditsDesc) creditsDesc.textContent = room.descricao;
+  if (creditsLink) creditsLink.href = room.url;
+
+  const targetSrc = `https://www.youtube.com/embed/${room.videoId}?autoplay=1&mute=1&rel=0`;
+  if (iframe && iframe.getAttribute('src') !== targetSrc) {
+    iframe.src = targetSrc;
+  }
+}
+
+/**
+ * Para o vídeo do YouTube limpando o `src` do iframe ao voltar ao Lobby.
+ */
+export function stopYoutubePlayer() {
+  const iframe = /** @type {HTMLIFrameElement | null} */ (
+    document.getElementById('youtube-iframe')
+  );
+  if (iframe) {
+    iframe.src = '';
+  }
+}
+
+/**
+ * Alterna visualmente entre a Aba 1 ("Chat ao Vivo") e a Aba 2 ("Dúvidas (N)").
+ */
+export function renderActiveTab() {
+  const btnChat = document.getElementById('tab-btn-chat');
+  const btnQuestions = document.getElementById('tab-btn-questions');
+  const panelChat = document.getElementById('tab-panel-chat');
+  const panelQuestions = document.getElementById('tab-panel-questions');
+
+  if (!btnChat || !btnQuestions || !panelChat || !panelQuestions) return;
+
+  const isChat = state.activeTab === 'chat';
+
+  btnChat.setAttribute('aria-selected', String(isChat));
+  btnQuestions.setAttribute('aria-selected', String(!isChat));
+
+  btnChat.className = isChat
+    ? 'py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition bg-indigo-600 text-white shadow'
+    : 'py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60';
+
+  btnQuestions.className = !isChat
+    ? 'py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition bg-indigo-600 text-white shadow'
+    : 'py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60';
+
+  if (isChat) {
+    panelChat.classList.remove('hidden');
+    panelChat.classList.add('flex');
+    panelQuestions.classList.add('hidden');
+    panelQuestions.classList.remove('flex');
+  } else {
+    panelChat.classList.add('hidden');
+    panelChat.classList.remove('flex');
+    panelQuestions.classList.remove('hidden');
+    panelQuestions.classList.add('flex');
+  }
+}
+
+/**
+ * Renderiza a lista de mensagens e avisos de entrada/saída na Aba 1 (Chat ao Vivo).
  * Usa exclusivamente `textContent`.
  */
 export function renderChatMessages() {
   const container = document.getElementById('chat-messages');
-  const countBadge = document.getElementById('chat-count-badge');
   if (!container) return;
 
   container.replaceChildren();
-
-  const totalMsgs = state.messages.filter((m) => m.type === 'mensagem').length;
-  if (countBadge) {
-    countBadge.textContent = `${totalMsgs} ${totalMsgs === 1 ? 'msg' : 'msgs'}`;
-  }
 
   if (state.messages.length === 0) {
     const emptyBox = document.createElement('div');
@@ -218,15 +288,12 @@ export function renderChatMessages() {
 
     const title = document.createElement('p');
     title.className = 'text-xs font-medium text-slate-400';
-    title.textContent = state.joinedRoom
-      ? 'Nenhuma mensagem nesta sala ainda.'
-      : 'Você ainda não entrou na sala.';
+    title.textContent = 'Nenhuma mensagem nesta aula ainda.';
 
     const subtitle = document.createElement('p');
     subtitle.className = 'text-[11px] text-slate-500 mt-1';
-    subtitle.textContent = state.joinedRoom
-      ? 'Envie a primeira mensagem ou marque uma pergunta como dúvida!'
-      : 'Informe seu nome no topo e clique em "Entrar" para iniciar o chat.';
+    subtitle.textContent =
+      'Envie uma mensagem para a turma ou marque "Marcar como dúvida" para enviar à aba Dúvidas.';
 
     emptyBox.appendChild(title);
     emptyBox.appendChild(subtitle);
@@ -254,14 +321,11 @@ export function renderChatMessages() {
       return;
     }
 
-    // Mensagem de usuário
     const msg = item.payload;
     const isMine = Boolean(state.socketId && msg.id === state.socketId);
 
     const wrapper = document.createElement('div');
-    wrapper.className = isMine
-      ? 'flex flex-col items-end'
-      : 'flex flex-col items-start';
+    wrapper.className = isMine ? 'flex flex-col items-end' : 'flex flex-col items-start';
 
     const bubble = document.createElement('div');
     bubble.className = isMine
@@ -294,88 +358,97 @@ export function renderChatMessages() {
     container.appendChild(wrapper);
   });
 
-  // Rolagem automática para a última mensagem
   container.scrollTop = container.scrollHeight;
 }
 
 /**
- * Renderiza o painel "Dúvidas da Aula (Mais Votadas)" ordenado por votos.
+ * Renderiza a Aba 2 ("Dúvidas (N)") com a lista vinda 100% do servidor (`lista_duvidas`).
+ * Regras estritas do botão/selo por dúvida:
+ *  - Se `duvida.voters[0] === socket.id`: selo/tag não clicável `"Minha dúvida · {duvida.voters.length}"`.
+ *  - Se não for autor, mas `duvida.voters.includes(socket.id)`: botão destacado e desabilitado `"Também é minha dúvida ✓ · {duvida.voters.length}"`.
+ *  - Caso contrário: botão clicável `"Também é minha dúvida · {duvida.voters.length}"` que emite `votar_duvida`.
  * Usa exclusivamente `textContent`.
  * @param {(questionId: string) => void} onVote
  */
-export function renderQuestionsPanel(onVote) {
+export function renderQuestionsTab(onVote) {
   const container = document.getElementById('questions-list');
+  const tabBtnQuestions = document.getElementById('tab-btn-questions');
   if (!container) return;
 
+  const questions = Array.isArray(state.questions) ? state.questions : [];
+
+  if (tabBtnQuestions) {
+    tabBtnQuestions.textContent = `Dúvidas (${questions.length})`;
+  }
+
   container.replaceChildren();
-  const questions = getSortedQuestions(state.selectedRoom);
 
   if (questions.length === 0) {
     const empty = document.createElement('div');
     empty.className =
-      'col-span-full text-center py-8 px-4 rounded-xl border border-dashed border-slate-800 text-xs text-slate-400';
-    empty.textContent = 'Nenhuma dúvida cadastrada nesta aula ainda. Envie a primeira marcando "Marcar como dúvida" no chat!';
+      'h-full flex flex-col items-center justify-center text-center py-10 px-4 text-xs text-slate-400';
+    empty.textContent =
+      'Nenhuma dúvida enviada nesta sala ainda. No chat, marque "Marcar como dúvida" para enviar a primeira!';
     container.appendChild(empty);
     return;
   }
 
-  questions.forEach((q, idx) => {
+  questions.forEach((duvida) => {
+    const voters = Array.isArray(duvida.voters) ? duvida.voters : [];
+    const voteCount = voters.length;
+    const isAuthor = Boolean(state.socketId && voters[0] === state.socketId);
+    const hasVoted = Boolean(state.socketId && voters.includes(state.socketId));
+
     const card = document.createElement('article');
     card.className =
-      'p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start justify-between gap-4 hover:border-slate-700 transition';
+      'p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-col gap-2.5';
 
-    const leftCol = document.createElement('div');
-    leftCol.className = 'flex-1 min-w-0';
-
-    const metaRow = document.createElement('div');
-    metaRow.className = 'flex items-center gap-2 flex-wrap mb-1';
-
-    if (idx === 0 && q.votes > 0) {
-      const topBadge = document.createElement('span');
-      topBadge.className =
-        'text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30';
-      topBadge.textContent = '★ Mais votada';
-      metaRow.appendChild(topBadge);
-    }
+    const topRow = document.createElement('div');
+    topRow.className = 'flex items-center justify-between gap-2';
 
     const authorSpan = document.createElement('span');
-    authorSpan.className = 'text-xs font-semibold text-indigo-400';
-    authorSpan.textContent = q.author;
+    authorSpan.className = 'text-xs font-semibold text-indigo-400 truncate';
+    authorSpan.textContent = duvida.username;
 
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'text-[11px] font-mono text-slate-500';
-    timeSpan.textContent = `• ${q.createdAt}`;
-
-    metaRow.appendChild(authorSpan);
-    metaRow.appendChild(timeSpan);
+    topRow.appendChild(authorSpan);
 
     const textP = document.createElement('p');
-    textP.className = 'text-sm text-slate-200 break-words leading-relaxed';
-    textP.textContent = q.text;
+    textP.className = 'text-sm text-slate-100 break-words leading-relaxed';
+    textP.textContent = duvida.text;
 
-    leftCol.appendChild(metaRow);
-    leftCol.appendChild(textP);
+    const actionRow = document.createElement('div');
+    actionRow.className = 'flex items-center justify-end pt-1';
 
-    const voteBtn = document.createElement('button');
-    voteBtn.type = 'button';
-    voteBtn.className = q.votedByMe
-      ? 'shrink-0 flex flex-col items-center justify-center px-3 py-2 rounded-xl border bg-indigo-600/20 border-indigo-500 text-indigo-300 text-xs font-semibold transition'
-      : 'shrink-0 flex flex-col items-center justify-center px-3 py-2 rounded-xl border bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-300 text-xs font-semibold transition';
+    if (isAuthor) {
+      // Selo/tag NÃO clicável para quem enviou a dúvida
+      const authorBadge = document.createElement('span');
+      authorBadge.className =
+        'inline-flex items-center px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold select-none';
+      authorBadge.textContent = `Minha dúvida · ${voteCount}`;
+      actionRow.appendChild(authorBadge);
+    } else if (hasVoted) {
+      // Botão destacado e desabilitado para quem já votou
+      const votedBtn = document.createElement('button');
+      votedBtn.type = 'button';
+      votedBtn.disabled = true;
+      votedBtn.className =
+        'inline-flex items-center px-3 py-1.5 rounded-lg bg-indigo-600/25 border border-indigo-500 text-indigo-200 text-xs font-semibold cursor-not-allowed opacity-90';
+      votedBtn.textContent = `Também é minha dúvida ✓ · ${voteCount}`;
+      actionRow.appendChild(votedBtn);
+    } else {
+      // Botão clicável para votar na dúvida
+      const voteBtn = document.createElement('button');
+      voteBtn.type = 'button';
+      voteBtn.className =
+        'inline-flex items-center px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-500 text-slate-200 hover:text-white text-xs font-semibold transition';
+      voteBtn.textContent = `Também é minha dúvida · ${voteCount}`;
+      voteBtn.addEventListener('click', () => onVote(duvida.id));
+      actionRow.appendChild(voteBtn);
+    }
 
-    const arrowSpan = document.createElement('span');
-    arrowSpan.className = 'text-xs leading-none';
-    arrowSpan.textContent = '▲ Votar';
-
-    const countSpan = document.createElement('span');
-    countSpan.className = 'text-sm font-bold font-mono mt-1';
-    countSpan.textContent = String(q.votes);
-
-    voteBtn.appendChild(arrowSpan);
-    voteBtn.appendChild(countSpan);
-    voteBtn.addEventListener('click', () => onVote(q.id));
-
-    card.appendChild(leftCol);
-    card.appendChild(voteBtn);
+    card.appendChild(topRow);
+    card.appendChild(textP);
+    card.appendChild(actionRow);
     container.appendChild(card);
   });
 }

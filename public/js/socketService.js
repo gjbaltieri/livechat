@@ -1,17 +1,10 @@
 /**
- * @file Serviço WebSocket isolado para comunicação com o servidor Socket.IO (http://localhost:3000).
- * Respeita estritamente os eventos definidos em `src/socket.ts`:
- *  - emit('entrar_sala', { room, username })
- *  - emit('mensagem', text)
- *  - on('mensagem', ({ id, username, text, createdAt }) => ...)
- *  - on('aviso', ({ text, createdAt }) => ...)
- *  - on('erro', ({ message }) => ...)
+ * @file Serviço WebSocket isolado para comunicação com o servidor Socket.IO.
+ * Conecta via `http://${window.location.hostname}:3000` para funcionar no PC e celular na mesma rede.
  */
 
-const BACKEND_URL =
-  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:3000'
-    : 'http://localhost:3000';
+const host = window.location.hostname || 'localhost';
+const BACKEND_URL = `http://${host}:3000`;
 
 /**
  * Inicializa o cliente Socket.IO v4.8.1 e registra os callbacks da aplicação.
@@ -21,6 +14,7 @@ const BACKEND_URL =
  *   onConnectError: (err: Error) => void,
  *   onMensagem: (payload: import('./types.js').MensagemPayload) => void,
  *   onAviso: (payload: import('./types.js').AvisoPayload) => void,
+ *   onListaDuvidas: (payload: import('./types.js').QuestionPayload[]) => void,
  *   onErro: (payload: import('./types.js').ErroPayload) => void,
  * }} handlers
  */
@@ -54,6 +48,10 @@ export function createSocketClient(handlers) {
     handlers.onAviso(payload);
   });
 
+  socket.on('lista_duvidas', (payload) => {
+    handlers.onListaDuvidas(payload);
+  });
+
   socket.on('erro', (payload) => {
     handlers.onErro(payload);
   });
@@ -74,6 +72,22 @@ export function createSocketClient(handlers) {
      */
     emitMensagem(text) {
       socket.emit('mensagem', text);
+    },
+
+    /**
+     * Envia o evento `nova_duvida` com payload `text` (string simples).
+     * @param {string} text
+     */
+    emitNovaDuvida(text) {
+      socket.emit('nova_duvida', text);
+    },
+
+    /**
+     * Envia o evento `votar_duvida` com payload `questionId` (string simples).
+     * @param {string} questionId
+     */
+    emitVotarDuvida(questionId) {
+      socket.emit('votar_duvida', questionId);
     },
 
     getId() {
