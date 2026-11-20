@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pecege Live — Plataforma de Aula ao Vivo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Toast Container (Avisos e Erros do Socket) -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+  <!-- Cabeçalho / Topo e Identificação do Aluno -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-600/30">
+          P
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base tracking-tight text-white">Pecege Live</h1>
+            <span id="conn-badge" class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <span id="conn-dot" class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              <span id="conn-text">Conectando...</span>
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Ambiente interativo de salas de aula em tempo real</p>
+        </div>
+      </div>
+
+      <!-- Formulário de Nome e Entrada na Sala -->
+      <form id="join-form" class="flex items-center gap-2">
+        <div class="relative flex-1 sm:w-64">
+          <input
+            id="username-input"
+            type="text"
+            maxlength="30"
+            placeholder="Digite seu nome (máx. 30)"
+            required
+            class="w-full rounded-lg bg-slate-800/90 border border-slate-700 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <button
+          id="join-btn"
+          type="submit"
+          class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium transition shadow-sm shadow-indigo-600/20 whitespace-nowrap"
+        >
+          Entrar
+        </button>
+      </form>
+    </div>
+
+    <!-- Barra de Seleção das 4 Salas Fixas -->
+    <div class="max-w-7xl mx-auto px-4 pb-3">
+      <div id="rooms-bar" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2" role="tablist" aria-label="Salas de aula">
+        <!-- Renderizado via JS (ui.js) -->
+      </div>
+    </div>
+  </header>
+
+  <!-- Conteúdo Principal -->
+  <main class="max-w-7xl w-full mx-auto px-4 py-6 flex-1 flex flex-col gap-6">
+
+    <!-- 2 Colunas no Desktop (Vídeo 16:9 à esquerda + Chat à direita) -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- Coluna Esquerda (Maior): Player de Vídeo Simulado -->
+      <div class="lg:col-span-8 flex flex-col gap-3">
+        <div class="relative aspect-video w-full rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 border border-slate-800 shadow-2xl flex flex-col justify-between p-5">
+          <!-- Topo do Player -->
+          <div class="flex items-center justify-between gap-2 z-10">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-600 text-white text-xs font-semibold uppercase tracking-wider shadow">
+                <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                AO VIVO
+              </span>
+              <span id="player-room-code" class="text-xs font-mono px-2 py-1 rounded bg-slate-800/80 text-slate-300 border border-slate-700">
+                aula-01
+              </span>
+            </div>
+            <div class="text-xs text-slate-300 bg-slate-900/70 border border-slate-800 px-2.5 py-1 rounded-md">
+              Sala ativa: <strong id="player-user-status" class="text-indigo-400">Não conectado à sala</strong>
+            </div>
+          </div>
+
+          <!-- Centro Visual do Player Simulado -->
+          <div class="my-auto flex flex-col items-center text-center px-4 z-10">
+            <div class="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mb-3 text-indigo-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+            <p class="text-xs uppercase tracking-widest text-indigo-400 font-semibold mb-1">Transmissão da Aula</p>
+            <h2 id="player-room-title" class="text-xl sm:text-2xl font-bold text-white max-w-xl">
+              Estruturas de Dados
+            </h2>
+            <p id="player-room-teacher" class="text-xs sm:text-sm text-slate-400 mt-1">
+              Prof. Rafael Mendes • Módulo Ao Vivo
+            </p>
+          </div>
+
+          <!-- Controles Visuais Básicos do Player -->
+          <div class="z-10 flex flex-col gap-2 bg-slate-950/70 backdrop-blur-sm p-3 rounded-xl border border-slate-800/80">
+            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-red-500 h-full w-full"></div>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-300">
+              <div class="flex items-center gap-3">
+                <button type="button" id="player-play-btn" class="hover:text-white transition flex items-center gap-1" title="Pausar/Reproduzir simulação">
+                  <span id="player-play-label">⏸ Pausar</span>
+                </button>
+                <button type="button" id="player-mute-btn" class="hover:text-white transition" title="Alternar áudio simulado">
+                  🔊 100%
+                </button>
+                <span class="text-slate-400 font-mono">AO VIVO • 1080p60</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-slate-400 hidden sm:inline">Latência baixa</span>
+                <button type="button" id="player-fullscreen-btn" class="hover:text-white transition" title="Tela cheia">
+                  ⛶ Tela cheia
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coluna Direita: Chat ao Vivo da Sala -->
+      <aside class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col h-[520px] shadow-xl overflow-hidden">
+        <!-- Topo do Chat -->
+        <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+          <div>
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              Chat da Sala
+              <span id="chat-room-badge" class="text-xs font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                aula-01
+              </span>
+            </h3>
+            <p id="chat-subtitle" class="text-xs text-slate-400">Informe seu nome acima e clique em Entrar</p>
+          </div>
+          <span id="chat-count-badge" class="text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded-md">
+            0 msgs
+          </span>
+        </div>
+
+        <!-- Lista de Mensagens (Com Rolagem Automática) -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+          <!-- Estado vazio inicial renderizado via JS -->
+        </div>
+
+        <!-- Rodapé do Chat -->
+        <form id="chat-form" class="p-3 border-t border-slate-800 bg-slate-950/60 flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <label class="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+              <input
+                id="question-checkbox"
+                type="checkbox"
+                class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span>Marcar como dúvida <span class="text-amber-400 font-medium">(adiciona ao painel abaixo)</span></span>
+            </label>
+            <span id="char-counter" class="text-[11px] text-slate-500 font-mono">0/500</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <input
+              id="chat-input"
+              type="text"
+              maxlength="500"
+              placeholder="Entre na sala para enviar mensagens..."
+              disabled
+              class="flex-1 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <button
+              id="chat-send-btn"
+              type="submit"
+              disabled
+              class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Enviar
+            </button>
+          </div>
+        </form>
+      </aside>
+    </section>
+
+    <!-- Seção Abaixo das Duas Colunas: Dúvidas da Aula (Mais Votadas) -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-4 border-b border-slate-800">
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="text-base font-bold text-white">Dúvidas da Aula (Mais Votadas)</h3>
+            <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+              Estado Local • Protótipo
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Marque a opção "Marcar como dúvida" ao enviar uma mensagem no chat ou vote nas dúvidas existentes para priorizá-las no topo.
+          </p>
+        </div>
+        <div class="text-xs text-slate-400">
+          Exibindo dúvidas de: <strong id="questions-room-label" class="text-indigo-400">Estruturas de Dados (aula-01)</strong>
+        </div>
+      </div>
+
+      <div id="questions-list" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <!-- Renderizado via JS (ui.js) com textContent -->
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
