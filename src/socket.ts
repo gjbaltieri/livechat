@@ -1,6 +1,7 @@
 import { config } from './config';
 import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
+import { addQuestion, getQuestions, voteQuestion } from './questions';
 
 export function setupSocket(httpServer: HttpServer) {
     const io = new Server(httpServer, {
@@ -32,8 +33,8 @@ export function setupSocket(httpServer: HttpServer) {
             socket.data.room = room;
             socket.data.username = username;
             socket.join(room);
+            socket.emit('lista_duvidas', getQuestions(room));
 
-            // Avisa apenas os outros alunos daquela sala
             socket.to(room).emit('aviso', {
                 text: `${username} entrou na aula.`,
                 createdAt: new Date().toISOString(),
@@ -41,7 +42,6 @@ export function setupSocket(httpServer: HttpServer) {
         });
 
         socket.on('mensagem', (text: string) => {
-
             const { room, username } = socket.data;
 
             if (!room || !username) {
@@ -53,7 +53,7 @@ export function setupSocket(httpServer: HttpServer) {
 
             const agora = Date.now();
             if (socket.data.lastMessageAt && agora - socket.data.lastMessageAt < 2000) {
-                socket.emit('erro', { message: 'Aguarde um pouco antes de enviar outra mensagem' })
+                socket.emit('erro', { message: 'Aguarde um pouco antes de enviar outra mensagem.' });
                 return;
             }
             socket.data.lastMessageAt = agora;
@@ -66,6 +66,35 @@ export function setupSocket(httpServer: HttpServer) {
                 text: cleanText,
                 createdAt: new Date().toISOString(),
             });
+        });
+
+        socket.on('nova_duvida', (text: string) => {
+            const { room, username } = socket.data;
+
+            if (!room || !username) {
+                socket.emit('erro', { message: 'Entre em uma sala antes de enviar dúvidas.' });
+                return;
+            }
+
+            if (typeof text !== 'string' || !text.trim()) return;
+
+            const agora = Date.now();
+            if (socket.data.lastQuestionAt && agora - socket.data.lastQuestionAt < 30_000) {
+                socket.emit('erro', { message: 'Aguarde 30 segundos antes de enviar outra dúvida.' });
+                return;
+            }
+            socket.data.lastQuestionAt = agora;
+
+            addQuestion(room, socket.id, username, text.trim().slice(0, 300));
+            io.to(room).emit('lista_duvidas', getQuestions(room));
+        });
+
+        socket.on('votar_duvida', (questionId: string) => {
+            const { room } = socket.data;
+            if (!room || typeof questionId !== 'string') return;
+
+            voteQuestion(questionId, socket.id);
+            io.to(room).emit('lista_duvidas', getQuestions(room));
         });
 
         socket.on('disconnect', () => {
