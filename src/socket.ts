@@ -2,22 +2,24 @@ import { config } from './config';
 import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { addQuestion, getQuestions, voteQuestion } from './questions';
+import { updateRooms } from './updateRooms';
 
-export function setupSocket(httpServer: HttpServer) {
+export async function setupSocket(httpServer: HttpServer) {
     const io = new Server(httpServer, {
         cors: { origin: config.corsOrigin },
         maxHttpBufferSize: 1e4, // 10 KB
     });
 
-    io.on('connection', (socket) => {
+    io.on('connection', async (socket) => {
         console.log(`Cliente conectado: ${socket.id}`);
 
-        socket.on('entrar_sala', (dados: { room?: string; username?: string }) => {
+        socket.on('entrar_sala', async (dados: { room?: string; username?: string }) => {
             if (!dados || typeof dados.room !== 'string' || typeof dados.username !== 'string') {
                 socket.emit('erro', { message: 'Informe a sala e o nome de usuário.' });
                 return;
             }
 
+            updateRooms(io)
             const room = dados.room.trim();
             const username = dados.username.trim().slice(0, 30);
 
@@ -31,10 +33,11 @@ export function setupSocket(httpServer: HttpServer) {
             }
 
             socket.data.room = room;
+
             socket.data.username = username;
             socket.join(room);
+            updateRooms(io)
             socket.emit('lista_duvidas', getQuestions(room));
-
             socket.to(room).emit('aviso', {
                 text: `${username} entrou na aula.`,
                 createdAt: new Date().toISOString(),
@@ -44,10 +47,6 @@ export function setupSocket(httpServer: HttpServer) {
         socket.on('mensagem', (text: string) => {
             const { room, username } = socket.data;
 
-            if (!room || !username) {
-                socket.emit('erro', { message: 'Entre em uma sala antes de enviar mensagens.' });
-                return;
-            }
 
             if (typeof text !== 'string' || !text.trim()) return;
 
@@ -91,9 +90,11 @@ export function setupSocket(httpServer: HttpServer) {
 
         socket.on('votar_duvida', (questionId: string) => {
             const { room } = socket.data;
+
             if (!room || typeof questionId !== 'string') return;
 
             voteQuestion(questionId, socket.id);
+
             io.to(room).emit('lista_duvidas', getQuestions(room));
         });
 
@@ -108,7 +109,9 @@ export function setupSocket(httpServer: HttpServer) {
             }
 
             console.log(`Cliente desconectado: ${socket.id}`);
+            updateRooms(io)
         });
+
     });
 
     return io;
