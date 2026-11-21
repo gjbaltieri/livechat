@@ -42,6 +42,13 @@
  */
 
 /**
+ * Item retornado no array do evento `contagem_salas` pelo backend (`src/updateRooms.ts`).
+ * @typedef {Object} ContagemSalaPayload
+ * @property {string} nome - Identificador interno da sala (ex: "aula-01")
+ * @property {number} participantes - Quantidade atual de alunos conectados na sala
+ */
+
+/**
  * Configuração de cada sala da plataforma AulaLive.
  * @typedef {Object} RoomConfig
  * @property {string} id

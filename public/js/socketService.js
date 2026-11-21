@@ -12,41 +12,48 @@
  *   onMensagem: (payload: import('./types.js').MensagemPayload) => void,
  *   onAviso: (payload: import('./types.js').AvisoPayload) => void,
  *   onListaDuvidas: (payload: import('./types.js').QuestionPayload[]) => void,
+ *   onContagemSalas: (payload: import('./types.js').ContagemSalaPayload[]) => void,
  *   onErro: (payload: import('./types.js').ErroPayload) => void,
  * }} handlers
  */
 export function createSocketClient(handlers) {
   // global `io` servido pelo próprio backend em /socket.io/socket.io.js
   // @ts-ignore
+  if (typeof window.io !== 'function') {
+    handlers.onConnectError(new Error('Socket.IO client não carregado.'));
+    return {
+      emitEntrarSala() {},
+      emitSairSala() {},
+      emitMensagem() {},
+      emitNovaDuvida() {},
+      emitVotarDuvida() {},
+      getId() {
+        return null;
+      },
+      destroy() {},
+    };
+  }
+
+  // @ts-ignore
   const socket = window.io();
 
-  socket.on('connect', () => {
-    handlers.onConnect(socket.id);
-  });
+  const handleConnect = () => handlers.onConnect(socket.id);
+  const handleDisconnect = (reason) => handlers.onDisconnect(reason);
+  const handleConnectError = (err) => handlers.onConnectError(err);
+  const handleMensagem = (payload) => handlers.onMensagem(payload);
+  const handleAviso = (payload) => handlers.onAviso(payload);
+  const handleListaDuvidas = (payload) => handlers.onListaDuvidas(payload);
+  const handleContagemSalas = (payload) => handlers.onContagemSalas(payload);
+  const handleErro = (payload) => handlers.onErro(payload);
 
-  socket.on('disconnect', (reason) => {
-    handlers.onDisconnect(reason);
-  });
-
-  socket.on('connect_error', (err) => {
-    handlers.onConnectError(err);
-  });
-
-  socket.on('mensagem', (payload) => {
-    handlers.onMensagem(payload);
-  });
-
-  socket.on('aviso', (payload) => {
-    handlers.onAviso(payload);
-  });
-
-  socket.on('lista_duvidas', (payload) => {
-    handlers.onListaDuvidas(payload);
-  });
-
-  socket.on('erro', (payload) => {
-    handlers.onErro(payload);
-  });
+  socket.on('connect', handleConnect);
+  socket.on('disconnect', handleDisconnect);
+  socket.on('connect_error', handleConnectError);
+  socket.on('mensagem', handleMensagem);
+  socket.on('aviso', handleAviso);
+  socket.on('lista_duvidas', handleListaDuvidas);
+  socket.on('contagem_salas', handleContagemSalas);
+  socket.on('erro', handleErro);
 
   return {
     /**
@@ -56,6 +63,13 @@ export function createSocketClient(handlers) {
      */
     emitEntrarSala(room, username) {
       socket.emit('entrar_sala', { room, username });
+    },
+
+    /**
+     * Envia o evento `sair_sala` para sair da sala atual sem desconectar o socket.
+     */
+    emitSairSala() {
+      socket.emit('sair_sala');
     },
 
     /**
@@ -84,6 +98,20 @@ export function createSocketClient(handlers) {
 
     getId() {
       return socket.id ?? null;
+    },
+
+    /**
+     * Remove todos os listeners registrados para evitar vazamentos ou duplicidade.
+     */
+    destroy() {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleConnectError);
+      socket.off('mensagem', handleMensagem);
+      socket.off('aviso', handleAviso);
+      socket.off('lista_duvidas', handleListaDuvidas);
+      socket.off('contagem_salas', handleContagemSalas);
+      socket.off('erro', handleErro);
     },
   };
 }

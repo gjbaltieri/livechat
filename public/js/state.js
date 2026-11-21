@@ -60,6 +60,8 @@ export const state = {
   /** @type {'chat' | 'questions'} */
   activeTab: 'chat',
   /** @type {string | null} */
+  selectedRoom: null,
+  /** @type {string | null} */
   joinedRoom: null,
   /** @type {string} */
   username: '',
@@ -70,4 +72,20 @@ export const state = {
    * @type {import('./types.js').QuestionPayload[]}
    */
   questions: [],
+  /**
+   * Quantidade de participantes conectados por sala vinda de `contagem_salas`.
+   * @type {Record<string, number>}
+   */
+  roomParticipants: {},
 };
+
+/**
+ * Retorna a quantidade de alunos conectados em uma sala (0 quando não houver nenhum).
+ * @param {string | null} roomId
+ * @returns {number}
+ */
+export function getRoomParticipantsCount(roomId) {
+  if (!roomId) return 0;
+  const count = state.roomParticipants[roomId];
+  return typeof count === 'number' && count > 0 ? count : 0;
+}

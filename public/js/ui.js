@@ -3,7 +3,16 @@
  * (uso exclusivo de document.createElement e textContent).
  */
 
-import { ROOMS_CONFIG, ROOMS_LIST, state } from './state.js';
+import { ROOMS_CONFIG, ROOMS_LIST, state, getRoomParticipantsCount } from './state.js';
+
+/**
+ * Formata a quantidade de participantes ("0 alunos online", "1 aluno online", "2 alunos online").
+ * @param {number} count
+ * @returns {string}
+ */
+function formatParticipantsLabel(count) {
+  return count === 1 ? '1 aluno online' : `${count} alunos online`;
+}
 
 /**
  * Formata uma string ISO-8601 no formato local `HH:mm`.
@@ -94,6 +103,8 @@ export function renderLobbyCards(onSelectRoom) {
   ROOMS_LIST.forEach((room) => {
     const card = document.createElement('button');
     card.type = 'button';
+    card.dataset.roomCard = room.id;
+    card.setAttribute('aria-pressed', 'false');
     card.className =
       'group text-left p-5 rounded-2xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/70 transition-all shadow-lg hover:shadow-indigo-950/40 flex flex-col justify-between gap-4';
 
@@ -113,13 +124,22 @@ export function renderLobbyCards(onSelectRoom) {
     liveBadge.appendChild(pingDot);
     liveBadge.appendChild(liveText);
 
-    const codeBadge = document.createElement('span');
-    codeBadge.className =
-      'text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700';
-    codeBadge.textContent = room.id;
+    const participantsBadge = document.createElement('span');
+    participantsBadge.className =
+      'inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-md bg-slate-950/80 text-slate-300 border border-slate-700/80';
+
+    const participantsDot = document.createElement('span');
+    participantsDot.className = 'w-1.5 h-1.5 rounded-full bg-indigo-400';
+
+    const participantsText = document.createElement('span');
+    participantsText.dataset.roomCount = room.id;
+    participantsText.textContent = formatParticipantsLabel(getRoomParticipantsCount(room.id));
+
+    participantsBadge.appendChild(participantsDot);
+    participantsBadge.appendChild(participantsText);
 
     topBar.appendChild(liveBadge);
-    topBar.appendChild(codeBadge);
+    topBar.appendChild(participantsBadge);
 
     const middleBox = document.createElement('div');
     middleBox.className = 'space-y-1';
@@ -145,14 +165,16 @@ export function renderLobbyCards(onSelectRoom) {
     footerBar.className =
       'pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-indigo-400 group-hover:text-indigo-300';
 
-    const enterLabel = document.createElement('span');
-    enterLabel.textContent = 'Entrar na sala ao vivo';
+    const selectLabel = document.createElement('span');
+    selectLabel.dataset.roomSelectLabel = room.id;
+    selectLabel.textContent = 'Selecionar aula';
 
     const arrowSpan = document.createElement('span');
+    arrowSpan.dataset.roomSelectIcon = room.id;
     arrowSpan.className = 'transform group-hover:translate-x-1 transition';
     arrowSpan.textContent = '→';
 
-    footerBar.appendChild(enterLabel);
+    footerBar.appendChild(selectLabel);
     footerBar.appendChild(arrowSpan);
 
     card.appendChild(topBar);
@@ -161,6 +183,36 @@ export function renderLobbyCards(onSelectRoom) {
 
     card.addEventListener('click', () => onSelectRoom(room.id));
     grid.appendChild(card);
+  });
+
+  renderLobbySelection();
+}
+
+/**
+ * Destaca visualmente o card da sala selecionada no Lobby.
+ */
+export function renderLobbySelection() {
+  const cards = document.querySelectorAll('[data-room-card]');
+  const baseClass =
+    'group text-left p-5 rounded-2xl transition-all shadow-lg flex flex-col justify-between gap-4';
+
+  cards.forEach((card) => {
+    const roomId = card.getAttribute('data-room-card');
+    const isSelected = Boolean(roomId && state.selectedRoom === roomId);
+
+    card.setAttribute('aria-pressed', String(isSelected));
+    card.className = isSelected
+      ? `${baseClass} bg-indigo-950/45 border-2 border-indigo-500 ring-2 ring-indigo-500/35 shadow-indigo-950/60`
+      : `${baseClass} bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/70 hover:shadow-indigo-950/40`;
+
+    const label = card.querySelector('[data-room-select-label]');
+    const icon = card.querySelector('[data-room-select-icon]');
+    if (label) {
+      label.textContent = isSelected ? 'Aula selecionada' : 'Selecionar aula';
+    }
+    if (icon) {
+      icon.textContent = isSelected ? '✓' : '→';
+    }
   });
 }
 
@@ -194,7 +246,6 @@ export function renderClassroomDetails() {
   const room = ROOMS_CONFIG[state.joinedRoom];
   if (!room) return;
 
-  const codeBadge = document.getElementById('room-code-badge');
   const subjectTitle = document.getElementById('room-subject-title');
   const studentName = document.getElementById('room-student-name');
   const creditsChannel = document.getElementById('credits-channel');
@@ -207,7 +258,6 @@ export function renderClassroomDetails() {
     document.getElementById('youtube-iframe')
   );
 
-  if (codeBadge) codeBadge.textContent = room.id;
   if (subjectTitle) subjectTitle.textContent = `${room.materia} — ${room.canal}`;
   if (studentName) studentName.textContent = state.username;
 
@@ -219,6 +269,27 @@ export function renderClassroomDetails() {
   const targetSrc = `https://www.youtube.com/embed/${room.videoId}?autoplay=1&mute=1&rel=0`;
   if (iframe && iframe.getAttribute('src') !== targetSrc) {
     iframe.src = targetSrc;
+  }
+
+  renderRoomParticipants();
+}
+
+/**
+ * Atualiza a contagem de alunos conectados nos cards do Lobby e no cabeçalho da sala ativa.
+ * Usa exclusivamente `textContent`.
+ */
+export function renderRoomParticipants() {
+  const lobbyCounters = document.querySelectorAll('[data-room-count]');
+  lobbyCounters.forEach((el) => {
+    const roomId = el.getAttribute('data-room-count');
+    el.textContent = formatParticipantsLabel(getRoomParticipantsCount(roomId));
+  });
+
+  const activeRoomCounter = document.getElementById('room-participants-count');
+  if (activeRoomCounter) {
+    activeRoomCounter.textContent = formatParticipantsLabel(
+      getRoomParticipantsCount(state.joinedRoom)
+    );
   }
 }
 
