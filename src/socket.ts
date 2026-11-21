@@ -10,8 +10,10 @@ export async function setupSocket(httpServer: HttpServer) {
         maxHttpBufferSize: 1e4, // 10 KB
     });
 
-    io.on('connection', async (socket) => {
+    io.on('connection', (socket) => {
         console.log(`Cliente conectado: ${socket.id}`);
+        io.emit('contagem_salas', updateRooms(io));
+
 
         socket.on('entrar_sala', async (dados: { room?: string; username?: string }) => {
             if (!dados || typeof dados.room !== 'string' || typeof dados.username !== 'string') {
@@ -19,9 +21,9 @@ export async function setupSocket(httpServer: HttpServer) {
                 return;
             }
 
-            updateRooms(io)
             const room = dados.room.trim();
             const username = dados.username.trim().slice(0, 30);
+
 
             if (!room || !username) {
                 socket.emit('erro', { message: 'Sala e nome de usuário não podem estar vazios.' });
@@ -36,7 +38,7 @@ export async function setupSocket(httpServer: HttpServer) {
 
             socket.data.username = username;
             socket.join(room);
-            updateRooms(io)
+            io.emit('contagem_salas', updateRooms(io));
             socket.emit('lista_duvidas', getQuestions(room));
             socket.to(room).emit('aviso', {
                 text: `${username} entrou na aula.`,
@@ -109,9 +111,25 @@ export async function setupSocket(httpServer: HttpServer) {
             }
 
             console.log(`Cliente desconectado: ${socket.id}`);
-            updateRooms(io)
+            io.emit('contagem_salas', updateRooms(io));
         });
 
+        socket.on('sair_sala', () => {
+            const { room, username } = socket.data;
+            if (!room) return;
+
+            socket.leave(room);
+            socket.data.room = undefined;
+
+            if (username) {
+                socket.to(room).emit('aviso', {
+                    text: `${username} saiu da aula.`,
+                    createdAt: new Date().toISOString(),
+                });
+            }
+
+            io.emit('contagem_salas', updateRooms(io));
+        });
     });
 
     return io;
