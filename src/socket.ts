@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import { addQuestion, getQuestions, voteQuestion } from './questions';
 import { updateRooms } from './updateRooms';
 
-export async function setupSocket(httpServer: HttpServer) {
+export function setupSocket(httpServer: HttpServer) {
     const io = new Server(httpServer, {
         cors: { origin: config.corsOrigin },
         maxHttpBufferSize: 1e4, // 10 KB
