@@ -71,5 +71,9 @@ Acesse http://localhost:3000 no navegador.
 🎥 Créditos das Aulas
 Os vídeos exibidos nas salas de demonstração são conteúdos educacionais públicos incorporados diretamente do YouTube, mantendo os devidos créditos aos respectivos professores e canais abaixo de cada player.
 
+## ⚠️ Nota sobre persistência
+
+Os dados (dúvidas e votos) são armazenados **em memória** no servidor para manter a arquitetura focada em comunicação em tempo real via WebSockets. Por isso, o histórico é reiniciado sempre que o servidor é reiniciado — incluindo após períodos de inatividade no plano gratuito do Render.
+
 👤 Autor
 Desenvolvido por Gustavo Baltieri
